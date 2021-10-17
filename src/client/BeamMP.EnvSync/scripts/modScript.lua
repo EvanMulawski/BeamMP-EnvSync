@@ -1,0 +1,2 @@
+load("MPEnvSync")
+registerCoreModule("MPEnvSync")
