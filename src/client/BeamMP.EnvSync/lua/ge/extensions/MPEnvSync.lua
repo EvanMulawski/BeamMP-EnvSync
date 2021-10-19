@@ -1,4 +1,6 @@
-M = {}
+print("[ENVSYNC] Loading")
+
+local M = {}
 
 local function setTimeOfDay(timeOfDay)
     core_environment.setTimeOfDay({time=timeOfDay, dayScale=1, nightScale=2, play=true})
@@ -7,4 +9,5 @@ end
 
 AddEventHandler("BeamMPEnvSyncSetTimeOfDay", setTimeOfDay)
 
+print("[ENVSYNC] Ready")
 return M
