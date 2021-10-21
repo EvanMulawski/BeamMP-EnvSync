@@ -105,16 +105,16 @@ BeamMPEnvSync = {
         local inc = self.options.timeOfDay.__dayLengthRealTimeSecondsPart
         for i = 1, elapsedSeconds do
             if newTimeOfDay >= self.GAME_NIGHTTIME_START_VALUE and newTimeOfDay < self.GAME_DAYTIME_START_VALUE then
-                self:print("night")
+                --self:print("night")
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.nighttimeScale)
             else
-                self:print("day")
+                --self:print("day")
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.daytimeScale)
             end
             if newTimeOfDay >= 1 then newTimeOfDay = newTimeOfDay - 1 end
         end
         self._state.timeOfDay = newTimeOfDay
-        self:print("Updated time of day to " .. newTimeOfDay)
+        --self:print("Updated time of day to " .. newTimeOfDay)
     end
 
     function BeamMPEnvSync:convertSecondsToGameTime(seconds)
