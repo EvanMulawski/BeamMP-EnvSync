@@ -76,6 +76,9 @@ BeamMPEnvSync = {
             -- todo: don't error, create file using _defaultOptions
         end
         local options = json.decode(optionsFile)
+        -- load default options
+        tableMerge(self.options, self._defaultOptions)
+        -- merge user options
         tableMerge(self.options, options)
         -- convert start time to game time
         local h_s, m_s = string.match(self.options.timeOfDay.serverWorldStartTime, "(%d%d):(%d%d)")
