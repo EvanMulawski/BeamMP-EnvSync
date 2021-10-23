@@ -45,6 +45,7 @@ BeamMPEnvSync = {
             fixed = false
         },
         syncRate = 2,
+        debug = false,
         admins = {}
     },
     options = {},
@@ -69,7 +70,7 @@ BeamMPEnvSync = {
         self:loadOptions()
         self._state.init = true
         self:recalcServerTimeOfDay()
-        self:print("Set initial time of day (" .. self._state.timeOfDay .. ")")
+        self:printDebug("Set initial time of day (" .. self._state.timeOfDay .. ")")
         postInit()
     end
 
@@ -104,7 +105,7 @@ BeamMPEnvSync = {
         self.options.timeOfDay.__dayLengthRealTimeSecondsPart = 1.0 / self.options.timeOfDay.dayLengthRealTimeSeconds
         self:updateDerivedOptions()
         -- print options
-        self:print("Running with options: " .. json.encode(self.options))
+        self:printDebug("Running with options: " .. json.encode(self.options))
     end
 
     function BeamMPEnvSync:updateDerivedOptions()
@@ -128,17 +129,15 @@ BeamMPEnvSync = {
         local newTimeOfDay = self._state.timeOfDay
         local inc = self.options.timeOfDay.__dayLengthRealTimeSecondsPart
         for i = 1, elapsedSeconds do
-            if newTimeOfDay >= self.GAME_NIGHTTIME_START_VALUE and newTimeOfDay < self.GAME_DAYTIME_START_VALUE then
-                --self:print("night")
+            local isNighttime = newTimeOfDay >= self.GAME_NIGHTTIME_START_VALUE and newTimeOfDay < self.GAME_DAYTIME_START_VALUE
+            if isNighttime then
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.nighttimeScale)
             else
-                --self:print("day")
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.daytimeScale)
             end
             if newTimeOfDay >= 1 then newTimeOfDay = newTimeOfDay - 1 end
         end
         self._state.timeOfDay = newTimeOfDay
-        --self:print("Updated time of day to " .. newTimeOfDay)
     end
 
     function BeamMPEnvSync:setTimeOfDay(value, fixed)
@@ -175,7 +174,7 @@ BeamMPEnvSync = {
         -- [5] = play
         -- [6] = azimuthOverride
         local data = t .. "|" .. self.options.timeOfDay.dayLengthRealTimeSeconds .. "|" .. self.options.timeOfDay.daytimeScale .. "|" .. self.options.timeOfDay.nighttimeScale .. "|" .. self.options.timeOfDay.__play .. "|" .. self.options.timeOfDay.azimuth
-        self:print("Syncing time of day (" .. t .. ")")
+        self:printDebug("Syncing time of day (" .. t .. ")")
         TriggerClientEvent(-1, "BeamMPEnvSyncSetTimeOfDay", data)
     end
 
@@ -192,6 +191,12 @@ BeamMPEnvSync = {
 
     function BeamMPEnvSync:print(s)
         print(self:createPrintMessage(s))
+    end
+
+    function BeamMPEnvSync:printDebug(s)
+        if self.options.debug then
+            self:print(s)
+        end
     end
 
     function BeamMPEnvSync:createPrintMessage(s)
