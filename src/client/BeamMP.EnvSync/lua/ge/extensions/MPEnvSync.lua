@@ -22,10 +22,10 @@ local function setTimeOfDay(timeOfDayData)
     -- [4] = nightScale
     -- [5] = play
     local play = false
-    if p[5] == 1 then play = true else play = false end
+    if p[5] == 1 then play = true end
     -- [6] = azimuthOverride
     print("[ENVSYNC] Sync: " .. timeOfDayData)
-    core_environment.setTimeOfDay({time=p[1], dayLength=p[2], dayScale=p[3], nightScale=p[4], play=p[5], azimuthOverride=p[6]})
+    core_environment.setTimeOfDay({time=p[1], dayLength=p[2], dayScale=p[3], nightScale=p[4], play=play, azimuthOverride=p[6]})
 end
 
 AddEventHandler("BeamMPEnvSyncSetTimeOfDay", setTimeOfDay)
