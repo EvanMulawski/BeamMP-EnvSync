@@ -150,13 +150,16 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:convertClockTimeToGameTime(value)
-        local h_s, m_s = string.match(value, "(%d%d):(%d%d)")
-        return self:convertSecondsToGameTime((tonumber(h_s) * self.SECONDS_PER_HOUR) + (tonumber(m_s) * self.SECONDS_PER_MINUTE))
+        local h_s, m_s = string.match(value, "^(%d%d):(%d%d)$")
+        if not h_s or not m_s then return nil end
+        return self:convertSecondsToGameTime(((tonumber(h_s) * self.SECONDS_PER_HOUR) + (tonumber(m_s) * self.SECONDS_PER_MINUTE)) % self.SECONDS_PER_DAY)
     end
 
     function BeamMPEnvSync:convertSecondsToGameTime(seconds)
+        -- sanitize
+        local s = math.min(self.SECONDS_PER_DAY, math.max(0, seconds or 0))
         -- need to convert range [0,86400) (12am-11:59pm) to [0,1) (12pm-11:59am)
-        local a = seconds + (self.SECONDS_PER_DAY / 2)
+        local a = s + (self.SECONDS_PER_DAY / 2)
         if a >= self.SECONDS_PER_DAY then
             a = a - self.SECONDS_PER_DAY
         end
