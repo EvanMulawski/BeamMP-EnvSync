@@ -19,4 +19,8 @@ See the wiki for additional information.
     - `nightScale`
     - `azimuthOverride`
     - `play`
-- Server admin configures these settings in the `timeOfDay` property of `envsync.json`
+- Server admin configures startup settings in the `timeOfDay` property of `envsync.json`
+
+### Set time of day via chat command
+
+- Configured admins can use the `/env set time` command via multiplayer chat to set the server's time of day and trigger a sync

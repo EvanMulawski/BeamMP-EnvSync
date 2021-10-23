@@ -16,6 +16,18 @@ local function tableMerge(t1, t2)
     return t1
 end
 
+-- https://stackoverflow.com/a/7615129/483349
+local function splitString(inputstr, sep)
+    if sep == nil then
+        sep = "%s"
+    end
+    local t = {}
+    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+        table.insert(t, str)
+    end
+    return t
+end
+
 BeamMPEnvSync = {
     _state = {
         tickCounter = 0,
@@ -32,7 +44,9 @@ BeamMPEnvSync = {
             azimuth = 0, -- todo: sanitize
             fixed = false
         },
-        syncRate = 2
+        syncRate = 2,
+        debug = false,
+        admins = {}
     },
     options = {},
     MINUTES_PER_DAY = 1440,
@@ -56,7 +70,7 @@ BeamMPEnvSync = {
         self:loadOptions()
         self._state.init = true
         self:recalcServerTimeOfDay()
-        self:print("Set initial time of day (" .. self._state.timeOfDay .. ")")
+        self:printDebug("Set initial time of day (" .. self._state.timeOfDay .. ")")
         postInit()
     end
 
@@ -81,17 +95,25 @@ BeamMPEnvSync = {
         -- merge user options
         tableMerge(self.options, options)
         -- convert start time to game time
-        local h_s, m_s = string.match(self.options.timeOfDay.serverWorldStartTime, "(%d%d):(%d%d)")
-        self._state.timeOfDay = self:convertSecondsToGameTime((tonumber(h_s) * self.SECONDS_PER_HOUR) + (tonumber(m_s) * self.SECONDS_PER_MINUTE))
+        self._state.timeOfDay = self:convertClockTimeToGameTime(self.options.timeOfDay.serverWorldStartTime) or self._defaultOptions.timeOfDay.serverWorldStartTime
         -- normalize/sanitize other options
-        self.options.syncRate = math.min(self.SYNC_RATE_MAX, math.max(self.SYNC_RATE_MIN, self.options.syncRate))
-        self.options.timeOfDay.daytimeScale = math.min(self.GAME_TIME_SCALE_MAX, math.max(self.GAME_TIME_SCALE_MIN, self.options.timeOfDay.daytimeScale))
-        self.options.timeOfDay.nighttimeScale = math.min(self.GAME_TIME_SCALE_MAX, math.max(self.GAME_TIME_SCALE_MIN, self.options.timeOfDay.nighttimeScale))
+        self.options.syncRate = math.min(self.SYNC_RATE_MAX, math.max(self.SYNC_RATE_MIN, self.options.syncRate or self._defaultOptions.syncRate))
+        self.options.timeOfDay.daytimeScale = math.min(self.GAME_TIME_SCALE_MAX, math.max(self.GAME_TIME_SCALE_MIN, self.options.timeOfDay.daytimeScale or self._defaultOptions.timeOfDay.daytimeScale))
+        self.options.timeOfDay.nighttimeScale = math.min(self.GAME_TIME_SCALE_MAX, math.max(self.GAME_TIME_SCALE_MIN, self.options.timeOfDay.nighttimeScale or self._defaultOptions.timeOfDay.nighttimeScale))
+        self.options.timeOfDay.dayLengthRealTimeSeconds = math.max(0, self.options.timeOfDay.dayLengthRealTimeSeconds or self._defaultOptions.timeOfDay.dayLengthRealTimeSeconds)
         -- other calculations
         self.options.timeOfDay.__dayLengthRealTimeSecondsPart = 1.0 / self.options.timeOfDay.dayLengthRealTimeSeconds
-        if self.options.timeOfDay.fixed then self.options.timeOfDay.__play = 0 else self.options.timeOfDay.__play = 1 end
+        self:updateDerivedOptions()
         -- print options
-        self:print("Running with options: " .. json.encode(self.options))
+        self:printDebug("Running with options: " .. json.encode(self.options))
+    end
+
+    function BeamMPEnvSync:updateDerivedOptions()
+        if self.options.timeOfDay.fixed then
+            self.options.timeOfDay.__play = 0
+        else
+            self.options.timeOfDay.__play = 1
+        end
     end
 
     function BeamMPEnvSync:recalcServerTimeOfDay()
@@ -107,22 +129,36 @@ BeamMPEnvSync = {
         local newTimeOfDay = self._state.timeOfDay
         local inc = self.options.timeOfDay.__dayLengthRealTimeSecondsPart
         for i = 1, elapsedSeconds do
-            if newTimeOfDay >= self.GAME_NIGHTTIME_START_VALUE and newTimeOfDay < self.GAME_DAYTIME_START_VALUE then
-                --self:print("night")
+            local isNighttime = newTimeOfDay >= self.GAME_NIGHTTIME_START_VALUE and newTimeOfDay < self.GAME_DAYTIME_START_VALUE
+            if isNighttime then
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.nighttimeScale)
             else
-                --self:print("day")
                 newTimeOfDay = newTimeOfDay + (inc * self.options.timeOfDay.daytimeScale)
             end
             if newTimeOfDay >= 1 then newTimeOfDay = newTimeOfDay - 1 end
         end
         self._state.timeOfDay = newTimeOfDay
-        --self:print("Updated time of day to " .. newTimeOfDay)
+    end
+
+    function BeamMPEnvSync:setTimeOfDay(value, fixed)
+        self.options.timeOfDay.fixed = fixed or self.options.timeOfDay.fixed
+        self:updateDerivedOptions()
+        self._state.timeOfDay = value
+        self._state.previousClockTime = os.time()
+        self:syncTimeOfDay()
+    end
+
+    function BeamMPEnvSync:convertClockTimeToGameTime(value)
+        local h_s, m_s = string.match(value, "^(%d%d):(%d%d)$")
+        if not h_s or not m_s then return nil end
+        return self:convertSecondsToGameTime(((tonumber(h_s) * self.SECONDS_PER_HOUR) + (tonumber(m_s) * self.SECONDS_PER_MINUTE)) % self.SECONDS_PER_DAY)
     end
 
     function BeamMPEnvSync:convertSecondsToGameTime(seconds)
+        -- sanitize
+        local s = math.min(self.SECONDS_PER_DAY, math.max(0, seconds or 0))
         -- need to convert range [0,86400) (12am-11:59pm) to [0,1) (12pm-11:59am)
-        local a = seconds + (self.SECONDS_PER_DAY / 2)
+        local a = s + (self.SECONDS_PER_DAY / 2)
         if a >= self.SECONDS_PER_DAY then
             a = a - self.SECONDS_PER_DAY
         end
@@ -138,7 +174,7 @@ BeamMPEnvSync = {
         -- [5] = play
         -- [6] = azimuthOverride
         local data = t .. "|" .. self.options.timeOfDay.dayLengthRealTimeSeconds .. "|" .. self.options.timeOfDay.daytimeScale .. "|" .. self.options.timeOfDay.nighttimeScale .. "|" .. self.options.timeOfDay.__play .. "|" .. self.options.timeOfDay.azimuth
-        self:print("Syncing time of day (" .. t .. ")")
+        self:printDebug("Syncing time of day (" .. t .. ")")
         TriggerClientEvent(-1, "BeamMPEnvSyncSetTimeOfDay", data)
     end
 
@@ -157,8 +193,82 @@ BeamMPEnvSync = {
         print(self:createPrintMessage(s))
     end
 
+    function BeamMPEnvSync:printDebug(s)
+        if self.options.debug then
+            self:print(s)
+        end
+    end
+
     function BeamMPEnvSync:createPrintMessage(s)
         return "[ENVSYNC] " .. s
+    end
+
+    function BeamMPEnvSync:tryHandleRawCommand(senderId, rawCommand)
+        if not self:isAdmin(senderId) then
+            return {
+                status = "access_denied"
+            }
+        end
+        local commandParseResult = self:tryParseRawCommand(rawCommand)
+        if not commandParseResult.valid then
+            return {
+                status = "no_command"
+            }
+        end
+        return self:handleCommand(commandParseResult.command)
+    end
+
+    function BeamMPEnvSync:handleCommand(command)
+        if command.name == "env" then
+            -- (set) (time) (<value>)
+            local sub = command.args[1]
+            if sub == "set" and command.args[2] == "time" then
+                local value = self:convertClockTimeToGameTime(command.args[3])
+                local modifier = command.args[4]
+                local fixed = nil
+                if value then
+                    if modifier then
+                        if modifier == "--fixed" then
+                            fixed = true
+                        elseif modifier == "--play" then
+                            fixed = false
+                        end
+                    end
+                    self:setTimeOfDay(value, fixed)
+                    return { status = "ok" }
+                end
+                return { status = "invalid_command" }
+            end
+        end
+        return { status = "invalid_command" }
+    end
+
+    function BeamMPEnvSync:tryParseRawCommand(rawCommand)
+        local commandParts = splitString(rawCommand, " ")
+        local commandName = string.match(commandParts[1], "^%s*/(%w+)$")
+        if not commandName then
+            return {
+                valid = false
+            }
+        end
+        table.remove(commandParts, 1)
+        return {
+            valid = true,
+            command = {
+                name = commandName,
+                args = commandParts
+            }
+        }
+    end
+
+    function BeamMPEnvSync:isAdmin(playerId)
+        local playerName = GetPlayerDiscordID(playerId)
+        for _, admin in ipairs(self.options.admins) do
+            if admin == playerName then 
+                return true
+            end
+        end
+        return false
     end
 -- end class BeamMPEnvSync
 
@@ -169,6 +279,7 @@ end
 function onEnvSyncInit()
     RegisterEvent("envSyncTick", "envSyncTick")
     RegisterEvent("onPlayerJoin", "onPlayerJoin")
+    RegisterEvent("onChatMessage", "onChatMessage")
     CreateThread("envSyncTick", 1)
 end
 
@@ -179,4 +290,18 @@ end
 
 function envSyncTick()
     BeamMPEnvSync:tick()
+end
+
+function onChatMessage(senderId, senderName, message)
+    local result = BeamMPEnvSync:tryHandleRawCommand(senderId, message)
+    if result.status == "no_command" then return end
+    if result.status == "access_denied" then
+        SendChatMessage(senderId, "You do not have permission to do this.")
+    elseif result.status == "invalid_command" then
+        SendChatMessage(senderId, "The command is invalid.")
+    elseif result.status == "ok" then
+        SendChatMessage(senderId, "Command completed successfully.")
+    else
+        SendChatMessage(senderId, "Command completed with an unknown status.")
+    end
 end
