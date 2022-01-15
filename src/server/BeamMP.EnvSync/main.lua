@@ -175,7 +175,7 @@ BeamMPEnvSync = {
         -- [6] = azimuthOverride
         local data = t .. "|" .. self.options.timeOfDay.dayLengthRealTimeSeconds .. "|" .. self.options.timeOfDay.daytimeScale .. "|" .. self.options.timeOfDay.nighttimeScale .. "|" .. self.options.timeOfDay.__play .. "|" .. self.options.timeOfDay.azimuth
         self:printDebug("Syncing time of day (" .. t .. ")")
-        TriggerClientEvent(-1, "BeamMPEnvSyncSetTimeOfDay", data)
+        MP.TriggerClientEvent(-1, "BeamMPEnvSyncSetTimeOfDay", data)
     end
 
     function BeamMPEnvSync:tick()
@@ -262,9 +262,9 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:isAdmin(playerId)
-        local playerName = GetPlayerDiscordID(playerId)
-        for _, admin in ipairs(self.options.admins) do
-            if admin == playerName then 
+        local playerBeammpId = MP.GetPlayerIdentifiers(playerId).beammp
+        for id, comment in pairs(self.options.admins) do
+            if id == playerBeammpId then
                 return true
             end
         end
@@ -277,10 +277,10 @@ function onInit()
 end
 
 function onEnvSyncInit()
-    RegisterEvent("envSyncTick", "envSyncTick")
-    RegisterEvent("onPlayerJoin", "onPlayerJoin")
-    RegisterEvent("onChatMessage", "onChatMessage")
-    CreateThread("envSyncTick", 1)
+    MP.RegisterEvent("envSyncTick", "envSyncTick")
+    MP.RegisterEvent("onPlayerJoin", "onPlayerJoin")
+    MP.RegisterEvent("onChatMessage", "onChatMessage")
+    MP.CreateEventTimer("envSyncTick", 1000)
 end
 
 function onPlayerJoin()
@@ -296,12 +296,12 @@ function onChatMessage(senderId, senderName, message)
     local result = BeamMPEnvSync:tryHandleRawCommand(senderId, message)
     if result.status == "no_command" then return end
     if result.status == "access_denied" then
-        SendChatMessage(senderId, "You do not have permission to do this.")
+        MP.SendChatMessage(senderId, "You do not have permission to do this.")
     elseif result.status == "invalid_command" then
-        SendChatMessage(senderId, "The command is invalid.")
+        MP.SendChatMessage(senderId, "The command is invalid.")
     elseif result.status == "ok" then
-        SendChatMessage(senderId, "Command completed successfully.")
+        MP.SendChatMessage(senderId, "Command completed successfully.")
     else
-        SendChatMessage(senderId, "Command completed with an unknown status.")
+        MP.SendChatMessage(senderId, "Command completed with an unknown status.")
     end
 end
