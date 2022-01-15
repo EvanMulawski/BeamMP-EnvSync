@@ -262,9 +262,9 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:isAdmin(playerId)
-        local playerName = MP.GetPlayerName(playerId)
-        for _, admin in ipairs(self.options.admins) do
-            if admin == playerName then 
+        local playerBeammpId = MP.GetPlayerIdentifiers(playerId).beammp
+        for id, comment in pairs(self.options.admins) do
+            if id == playerBeammpId then
                 return true
             end
         end
