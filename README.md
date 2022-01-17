@@ -2,11 +2,9 @@
 
 This is a work-in-progress BeamNG.drive mod and BeamMP plugin to synchronize an environment defined on the server with connected players.
 
-## Requirements
+## Installation
 
-- https://github.com/rxi/json.lua
-
-See the wiki for additional information.
+See the wiki.
 
 ## Features
 

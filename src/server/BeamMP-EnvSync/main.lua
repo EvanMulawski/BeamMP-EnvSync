@@ -1,5 +1,3 @@
-json = require("json")
-
 -- https://stackoverflow.com/a/1283608/483349
 local function tableMerge(t1, t2)
     for k,v in pairs(t2) do
@@ -64,7 +62,7 @@ BeamMPEnvSync = {
 }
     function BeamMPEnvSync:init(postInit)
         if (self._state.init) then
-            self:print("BeamMPEnvSync already initialized")
+            self:print("BeamMP-EnvSync already initialized")
             return
         end
         self:loadOptions()
@@ -75,21 +73,7 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:loadOptions()
-        -- read options file
-        local open = io.open
-        local function read_file(path)
-            local file = open(path, "rb")
-            if not file then return nil end
-            local content = file:read "*a"
-            file:close()
-            return content
-        end
-        local optionsFile = read_file("envsync.json")
-        if not optionsFile then
-            error(self:createPrintMessage("envsync.json does not exist"))
-            -- todo: don't error, create file using _defaultOptions
-        end
-        local options = json.decode(optionsFile)
+        local options = dofile("envsync.config.lua") or {}
         -- load default options
         tableMerge(self.options, self._defaultOptions)
         -- merge user options
@@ -104,8 +88,18 @@ BeamMPEnvSync = {
         -- other calculations
         self.options.timeOfDay.__dayLengthRealTimeSecondsPart = 1.0 / self.options.timeOfDay.dayLengthRealTimeSeconds
         self:updateDerivedOptions()
-        -- print options
-        self:printDebug("Running with options: " .. json.encode(self.options))
+        -- load admins
+        self:printDebug("Loading admins...")
+        self.options._adminBeammpIds = {}
+        for k, adminComment in pairs(self.options.admins) do
+            local kParts = splitString(k, "_")
+            if (kParts[1] == "beammp") then
+                local admin = kParts[2]
+                table.insert(self.options._adminBeammpIds, admin)
+                self:printDebug(" Admin: " .. admin .. " (" .. adminComment .. ")")
+            end
+        end
+        self:printDebug("Loaded " .. #self.options._adminBeammpIds .. " admins")
     end
 
     function BeamMPEnvSync:updateDerivedOptions()
@@ -263,8 +257,8 @@ BeamMPEnvSync = {
 
     function BeamMPEnvSync:isAdmin(playerId)
         local playerBeammpId = MP.GetPlayerIdentifiers(playerId).beammp
-        for id, comment in pairs(self.options.admins) do
-            if id == playerBeammpId then
+        for _, admin in ipairs(self.options._adminBeammpIds) do
+            if admin == playerBeammpId then
                 return true
             end
         end
