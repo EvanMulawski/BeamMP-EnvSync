@@ -17,7 +17,7 @@ See the wiki.
     - `nightScale`
     - `azimuthOverride`
     - `play`
-- Server admin configures startup settings in the `timeOfDay` property of `envsync.json`
+- Server admin configures startup settings `envsync.config.lua`
 
 ### Set time of day via chat command
 
