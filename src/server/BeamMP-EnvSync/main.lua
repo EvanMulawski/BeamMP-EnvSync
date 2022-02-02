@@ -135,7 +135,7 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:setTimeOfDay(value, fixed)
-        self.options.timeOfDay.fixed = fixed or self.options.timeOfDay.fixed
+        self.options.timeOfDay.fixed = fixed
         self:updateDerivedOptions()
         self._state.timeOfDay = value
         self._state.previousClockTime = os.time()
