@@ -198,15 +198,15 @@ BeamMPEnvSync = {
     end
 
     function BeamMPEnvSync:tryHandleRawCommand(senderId, rawCommand)
-        if not self:isAdmin(senderId) then
-            return {
-                status = "access_denied"
-            }
-        end
         local commandParseResult = self:tryParseRawCommand(rawCommand)
         if not commandParseResult.valid then
             return {
                 status = "no_command"
+            }
+        end
+        if not self:isAdmin(senderId) then
+            return {
+                status = "access_denied"
             }
         end
         return self:handleCommand(commandParseResult.command)
